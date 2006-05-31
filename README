@@ -1,3 +1,7 @@
+Loading: 
+
+Use asdf-install or asdf to compile cl-peg (see cl-peg.asd)
+
 Usage:
 
 First create a PEG grammar file, eg:
@@ -14,50 +18,74 @@ then create a grammar object and result object:
 
 (require 'cl-peg)
 (defvar *mygrammar*)
-(defvar *pr*)
+(defvar *parse-result*)
 
 CL-USER> (setf *mygrammar* (cl-peg:create-peg-parser "example.peg"))
 *MYGRAMMAR*
 
-Now you can parse some input (starting at offset 0):
+Now you can parse some input:
 
-CL-USER> (setf *pr* (cl-peg:parse *mygrammar* "the cat sat on the mat" 0))
-#S(CL-PEG:PR
+CL-USER> (setf *parse-result* (cl-peg:parse *mygrammar* "the cat sat on the mat"))
+#S(CL-PEG:PARSE-RESULT
    :MATCHED T
-   :RESULT #S(PV :PE NIL :CHILDREN NIL)
+   :MATCHED-WHOLE-INPUT T
+   :ROOT-PARSE-NODE NIL
    :ORIGINAL-INPUT "the cat sat on the mat"
    :ORIGINAL-INPUT-OFFSET 0)
 
 Once you have this parse-result you can check whether the parse succeeded:
 
-CL-USER> (cl-peg:pr-matched *pr*)
+CL-USER> (cl-peg:parse-result-matched *parse-result*)
 T
 
 whether all the input was matched (versus some prefix)
 
-CL-USER> (cl-peg:matched-all *pr*)
+CL-USER> (cl-peg:parse-result-matched-whole-input *parse-result*)
 T
 
-and see the indices of the region matched:
+To see the actual region that was matched, you have to save the parse tree when calling parse:
 
-CL-USER> (cl-peg:matched-region *pr*)
+CL-USER> (setf *parse-result* (cl-peg:parse *mygrammar* "the cat sat on the mat" :save-parse-tree t))
+<large tree>
+
+To see the indices of the region matched:
+
+CL-USER> (cl-peg:matched-region *parse-result*)
 (0 22)
 
 or the text:
 
-CL-USER> (cl-peg:pv-input-string *pr* (cl-peg:pr-result *pr*))
+CL-USER> (cl-peg:parse-result-original-input *parse-result*)
 "the cat sat on the mat"
 
-To see a detailed parse tree you have to specify keep-parse-result to the parse method:
+If you need to walk the parse tree, you can get the root parse-node with:
 
-CL-USER> (setf *pr* (cl-peg:parse *mygrammar* "the cat sat on the mat" 0 t))
-<large tree>
+CL-USER> (cl-peg:parse-result-root-parse-node *parse-result*)
+#S(PV :PE NT: |sentence| :CHILDREN (#S(PV :PE NT: |article| :CHILDREN #S(PV :PE NT: |spaces| :CHILDREN NIL))
+                                    (#S(PV :PE NT: |subject| :CHILDREN #S(PV :PE NT: |spaces| :CHILDREN NIL))
+                                     (#S(PV :PE NT: |verb| :CHILDREN #S(PV :PE NT: |spaces| :CHILDREN NIL))
+                                      (#S(PV :PE NT: |preposition| :CHILDREN #S(PV :PE NT: |spaces| :CHILDREN NIL))
+                                       (#S(PV :PE NT: |article| :CHILDREN #S(PV :PE NT: |spaces| :CHILDREN NIL))
+                                        #S(PV :PE NT: |object| :CHILDREN #S(PV :PE NT: |spaces| :CHILDREN NIL))))))))
 
-For more advanced usage (walking the parse tree or executing lisp code during the parse), the API is not yet defined. The pv struct is likely to change.
+Each parse node has a parse-element describing the part of the grammar related to it:
+
+CL-USER> (cl-peg:parse-node-parse-element (cl-peg:parse-result-root-parse-node *parse-result*))
+NT: |sentence|
+
+and optional child nodes:
+
+CL-USER> (cl-peg:parse-node-children (cl-peg:parse-result-root-parse-node *parse-result*))
+(#S(PV :PE NT: |article| :CHILDREN #S(PV :PE NT: |spaces| :CHILDREN NIL))
+ (#S(PV :PE NT: |subject| :CHILDREN #S(PV :PE NT: |spaces| :CHILDREN NIL))
+  (#S(PV :PE NT: |verb| :CHILDREN #S(PV :PE NT: |spaces| :CHILDREN NIL))
+   (#S(PV :PE NT: |preposition| :CHILDREN #S(PV :PE NT: |spaces| :CHILDREN NIL))
+    (#S(PV :PE NT: |article| :CHILDREN #S(PV :PE NT: |spaces| :CHILDREN NIL))
+     #S(PV :PE NT: |object| :CHILDREN #S(PV :PE NT: |spaces| :CHILDREN NIL)))))))
 
 John Leuner
-jewel at debian.org
-12 December 2005
+jewel at subvert-the-dominant-paradigm.net
+31 May 2006
 
 --------------------------------------------------------------------------------
 

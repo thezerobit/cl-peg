@@ -1,0 +1,75 @@
+Usage:
+
+First create a PEG grammar file, eg:
+
+sentence <-  article? subject verb ( preposition? article? (object / object preposition object ))
+spaces <- [ ]*
+article <- spaces ("the" / "the two" / "a")
+preposition <- spaces ("on" / "at" / "to" / "with")
+subject <- spaces ("man" / "men" / "dog" / "dogs" / "cat")
+verb <- spaces ("sat" / "saw" / "shot" / "gave")
+object <- spaces ("cannon" / "hat" / "mat")
+
+then create a grammar object and result object:
+
+(require 'cl-peg)
+(defvar *mygrammar*)
+(defvar *pr*)
+
+CL-USER> (setf *mygrammar* (cl-peg:create-peg-parser "example.peg"))
+*MYGRAMMAR*
+
+Now you can parse some input (starting at offset 0):
+
+CL-USER> (setf *pr* (cl-peg:parse *mygrammar* "the cat sat on the mat" 0))
+#S(CL-PEG:PR
+   :MATCHED T
+   :RESULT #S(PV :PE NIL :CHILDREN NIL)
+   :ORIGINAL-INPUT "the cat sat on the mat"
+   :ORIGINAL-INPUT-OFFSET 0)
+
+Once you have this parse-result you can check whether the parse succeeded:
+
+CL-USER> (cl-peg:pr-matched *pr*)
+T
+
+whether all the input was matched (versus some prefix)
+
+CL-USER> (cl-peg:matched-all *pr*)
+T
+
+and see the indices of the region matched:
+
+CL-USER> (cl-peg:matched-region *pr*)
+(0 22)
+
+or the text:
+
+CL-USER> (cl-peg:pv-input-string *pr* (cl-peg:pr-result *pr*))
+"the cat sat on the mat"
+
+To see a detailed parse tree you have to specify keep-parse-result to the parse method:
+
+CL-USER> (setf *pr* (cl-peg:parse *mygrammar* "the cat sat on the mat" 0 t))
+<large tree>
+
+For more advanced usage (walking the parse tree or executing lisp code during the parse), the API is not yet defined. The pv struct is likely to change.
+
+John Leuner
+jewel at debian.org
+12 December 2005
+
+--------------------------------------------------------------------------------
+
+Implementation notes:
+
+This is my first Lisp program, I'm sure there are many ugly hacks and inefficiencies. The code in pegreader.lisp only executes once when parsing the PEG definition and doesn't have to be very fast.
+
+pegobjects.lisp implements the classes that make up the peg grammar tree. Most of this file is hashing and comparison routines for the genhash library.
+
+Profiling this code suggests that the genhash library could be replaced with something faster.
+
+matcher.lisp contains the methods that match in the input against the peg grammar. Some over-optimisation here.
+
+yacc.lisp is cl-yacc. The reduce/reduce errors emitted while compiling the PEG grammar can be ignored, they are the result of the handling of MAGIC-DOT which matches any character (or the absence of any character, ie EOF).
+

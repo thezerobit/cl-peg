@@ -14,13 +14,24 @@
 (defvar *keep-parse-result* nil)
 (defvar *clean-parse-tree* nil)
 
-
 (defun parse (grammar input-text &key (input-offset 0) save-parse-tree uncleaned-parse-tree) (declare (type grammar grammar) (sequence input-text) (fixnum input-offset))
        ; use the first rule from the grammar as the target
        (parse-rule
 	grammar 
 	(first (slot-value grammar 'expr)) 
 	input-text 
+	input-offset 
+	save-parse-tree
+	uncleaned-parse-tree))
+
+(defun parse-file (grammar file-name &key (input-offset 0) save-parse-tree uncleaned-parse-tree) (declare (type grammar grammar) (fixnum input-offset))
+       ; use the first rule from the grammar as the target
+       (parse-rule
+	grammar 
+	(first (slot-value grammar 'expr))
+	(with-open-file (file file-name :direction :input) 
+	  (let ((s (make-string (file-length file))))
+	    (read-sequence s file) s))
 	input-offset 
 	save-parse-tree
 	uncleaned-parse-tree))
@@ -48,12 +59,8 @@
 
 
 ; each parsing element has a parse-and-match function
+; the parse table stores a parse-node for each parse-element at each attempted input-offset
 
-; the parse table stores a result for each parse-element and input-offset
-
-; at each cell in the table we store a pr structure which has a matched value of t or nil
-; if matched is t then the result slot points to a pv structure
-; if we are keeping results then the parse-element and children slots of the pv struct are filled
 
 (defstruct (parse-node (:constructor make-parse-value (parse-element children start-offset end-offset))
 	       )
@@ -99,7 +106,6 @@
       (make-pr matched (make-parse-value nil nil start-offset end-offset))
 ))
 
-
 ; perhaps for portability we should not limit this to strings
 
 (declaim (inline get-input-el))
@@ -130,13 +136,12 @@
 )
 
 (defun matched-all (pr)
-  (if (and (eq (first (matched-region pr)) (parse-result-original-input-offset pr))
-	   (eq (first (rest (matched-region pr))) (length (parse-result-original-input pr)))
-	   )
-      t
-      nil)
-)
-
+  (if (pr-matched pr)
+      (if (and (eq (first (matched-region pr)) (parse-result-original-input-offset pr))
+	   (eq (first (rest (matched-region pr))) (length (parse-result-original-input pr))))
+	  t
+	  nil)
+      nil))
 
 (defun build-pv-result-tree (result)
   (if (null result)
@@ -310,12 +315,7 @@
 		    (if (not (null (pr-matched pr2)))
 			(save-pr t l (list (parse-result-root-parse-node pr) (parse-result-root-parse-node pr2)) (min (parse-node-start-offset (parse-result-root-parse-node pr)) (parse-node-start-offset (parse-result-root-parse-node pr2))) (parse-node-end-offset (parse-result-root-parse-node pr2)))
 			(parse-fail)
-		  ))
-	      ))
-	    )
-	)
-      )
-  )
+		  ))))))))
 
 (defmethod parse-and-match ((oel ordered-expr-list) input-char-list input-offset)
   (let ((to-be-matched (slot-value oel 'expr)))
@@ -335,6 +335,9 @@
      (parse-fail)
      ))
 )
+
+(defmethod parse-and-match ((l lambda-ref) input-char-list input-offset)
+  (save-pr t l nil input-offset input-offset))
 
 (define-condition missing-non-terminal (error)
   ((text :initarg :text :reader text)))

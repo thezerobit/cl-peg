@@ -1,8 +1,6 @@
+(in-package #:cl-peg)
 
-
-(in-package :cl-peg)
-
-(declaim (optimize (speed 3) (safety 0) (debug 0)))
+;(declaim (optimize (speed 3) (safety 0) (debug 0)))
 
 ; ** classes modelling PEG expressions
 
@@ -10,7 +8,7 @@
 				      :initform nil)))
 
 
-(defclass grouping-element (parse-element) ((expr :initarg :expr)))
+(defclass grouping-element (parse-element) ((expr :initarg :expr :accessor expr)))
 
 (defclass parse-element-with-slot (parse-element) ((feature :initarg :feature
 							    :reader feature)))
@@ -23,9 +21,11 @@
 (defclass quoted-char (parse-element-with-slot) ())
 (defclass quoted-string (parse-element-with-slot) ()) 
 
+(defclass lambda-ref (parse-element-with-slot) ())
+
 ; this is the only grouping-element with an extra slot
 
-(defclass named-non-terminal (grouping-element) ((name :initarg :name)))
+(defclass named-non-terminal (grouping-element) ((name :initarg :name :accessor name)))
 
 (defclass grammar (grouping-element) ((non-terminal-map :initform nil
 							:reader non-terminal-map)
@@ -47,6 +47,7 @@
 (defclass bracketed-rule (grouping-element) ())
 
 
+
 (defgeneric prepare-matching-structures (grammar))
 (defgeneric clear-match-results (grammar))
 
@@ -57,8 +58,12 @@
 
 ; printing peg objects
 
+(defmethod print-object ((pe parse-element) stream)
+  (format stream "PE: ~S ~S" (class-of pe) (slot-value pe 'hash-val))
+)
+
 (defmethod print-object ((nt named-non-terminal) stream)
-  (format stream "NT: ~S" (slot-value nt 'name))
+  (format stream "NT: ~S ~S" (slot-value nt 'name) (slot-value nt 'hash-val))
 )
 ; ** memoization 
 
@@ -78,11 +83,10 @@
   
 (defun pe-hash (a)
   (typecase a
-    (parse-element (if (null (slot-value a 'hash-val))
-		       (progn
-			 (setf (slot-value a 'hash-val) (hash a))
-			 (slot-value a 'hash-val))
-		       (slot-value a 'hash-val)))
+    (parse-element (progn 
+		     (if (null (slot-value a 'hash-val))
+			 (setf (slot-value a 'hash-val) (hash a)))
+		     (slot-value a 'hash-val)))
     (t (sxhash a))))
 
 
@@ -127,83 +131,75 @@
   (equal (slot-value a 'feature) (slot-value b 'feature)))
 
 (defmethod hash ((pe parse-element-with-slot))
-  (logxor (sxhash (class-of pe)) (sxhash (slot-value pe 'feature)))
-)
+  (logxor (sxhash (class-of pe)) 
+	  (sxhash (slot-value pe 'feature))))
+
 
 ; grouping elements and the rest
 
 (defmethod hash ((ge grouping-element))
-  (logxor (sxhash (class-of ge)) (hash (slot-value ge 'expr)))
-)
+   (logxor (sxhash (class-of ge)) (hash (slot-value ge 'expr))))
+
+
 
 (defmethod hash ((nt named-non-terminal))
-  (logxor (sxhash (class-of nt)) (sxhash (slot-value nt 'name)) (hash (slot-value nt 'expr)))
-)
+  (prog1  (logxor (sxhash (class-of nt)) (sxhash (slot-value nt 'name)) (hash (slot-value nt 'expr)))
+    ;    (break "nt ~A" nt)
+    ))
 
 (defmethod hash ((l list))
-  (reduce #'logxor (loop for i in l collect (hash i))
-))
+  (if (null l)
+      (sxhash 'list)
+      (loop for el in l and
+	    accumulator = (sxhash 'list)
+	    do (setf accumulator (logxor accumulator (hash el)))
+	    finally ( return accumulator))))
 
-(defmethod compare ((a null) (b null))
-t
-)
+(defmethod compare ((a null) (b null)) t)
 
 (defmethod compare ((a t) (b t))
-  (equal a b)
-)
+  (equal a b))
 
 (defmethod compare ((a list) (b list))
       (if (compare (first a) (first b))
 	  (compare (rest a) (rest b))
-	  nil)
-)
-
+	  nil))
 
 (defmethod compare ((a grouping-element) (b grouping-element))
-  nil
-)
+;  (format t "~A is not ~A~%" a b)
+  nil)
 
 (defmethod compare ((a grammar) (b grammar))
-  (eq a b)
-)
+  (eq a b))
+
 (defmethod compare ((a expression-list) (b expression-list))
-  (compare (slot-value a 'expr) (slot-value b 'expr))
-)
+  (compare (slot-value a 'expr) (slot-value b 'expr)))
 
 (defmethod compare ((a ordered-expr-list) (b ordered-expr-list))
-  (compare (slot-value a 'expr) (slot-value b 'expr))
-)
+  (compare (slot-value a 'expr) (slot-value b 'expr)))
 
 (defmethod compare ((a zero-or-more) (b zero-or-more))
-  (compare (slot-value a 'expr) (slot-value b 'expr))
-)
+  (compare (slot-value a 'expr) (slot-value b 'expr)))
 
 (defmethod compare ((a optional) (b optional))
-  (compare (slot-value a 'expr) (slot-value b 'expr))
-)
+  (compare (slot-value a 'expr) (slot-value b 'expr)))
 
 (defmethod compare ((a negated) (b negated))
-  (compare (slot-value a 'expr) (slot-value b 'expr))
-)
+  (compare (slot-value a 'expr) (slot-value b 'expr)))
 
 (defmethod compare ((a followed-by) (b followed-by))
-  (compare (slot-value a 'expr) (slot-value b 'expr))
-)
+  (compare (slot-value a 'expr) (slot-value b 'expr)))
 
 (defmethod compare ((a at-least-one) (b at-least-one))
-  (compare (slot-value a 'expr) (slot-value b 'expr))
-)
+  (compare (slot-value a 'expr) (slot-value b 'expr)))
 
 (defmethod compare ((a bracketed-rule) (b bracketed-rule))
-  (compare (slot-value a 'expr) (slot-value b 'expr))
-)
+  (compare (slot-value a 'expr) (slot-value b 'expr)))
 
 (defmethod compare ((a named-non-terminal) (b named-non-terminal))
   (if (equal (slot-value a 'name) (slot-value b 'name))
       (compare (slot-value a 'expr) (slot-value b 'expr))
-      nil)
-)
-
+      nil))
 
 (defclass parse-table () ((expressionToRowMap :initarg :expressionToRowMap
 					      :reader expressionToRowMap
@@ -296,7 +292,7 @@ t
 	    (if (not (eq (gethash (slot-value nt 'name) (non-terminal-map g)) nil))
 		(progn
 		  (format t "~A" (list (slot-value nt 'name) " installing non-terminal twice!"))
-		  (break )
+		  (break "installing non-terminal ~A twice" (slot-value nt 'name))
 		  )
 		(setf (gethash (slot-value nt 'name) (non-terminal-map g)) nt)))
   ; initialize the parse-table
@@ -312,3 +308,27 @@ t
   (NET.HEXAPODIA.HASHTABLES::all-hash-keys (pe-map g))
 )
 
+(defun workout ()
+  (let ((a (make-instance 'optional :expr (list (make-instance 'zero-or-more :expr (list (make-instance 'quoted-string :feature "what"))))))
+	(b (make-instance 'optional :expr (list (make-instance 'zero-or-more :expr (list (make-instance 'quoted-string :feature "gabble")))))))
+    (print "a ")
+    (print (hash a))
+    (print "b ")
+    (print (hash b))))
+
+(defun workout2 ()
+  (let ((a (make-instance 'optional :expr (list 
+					   (make-instance 'call-rule :feature 'martin) 
+					   (make-instance 'zero-or-more :expr (list 
+									       (make-instance 'quoted-string :feature "what") 
+									       (make-instance 'call-rule :feature 'martin))))))
+	(b (make-instance 'optional :expr (list 
+					   (make-instance 'call-rule :feature 'robert) 
+					   (make-instance 'zero-or-more :expr (list 
+									       (make-instance 'quoted-string :feature "what") 
+									       (make-instance 'call-rule :feature 'robert)))))))
+    (print "a ")
+    (print (hash a))
+    (print "b ")
+    (print (hash b))))
+  

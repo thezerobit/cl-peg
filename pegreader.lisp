@@ -1,6 +1,7 @@
-(in-package :cl-peg)
+(in-package #:cl-peg)
 
-(declaim (optimize (speed 3) (safety 0) (debug 0)))
+;(declaim (optimize (speed 3) (safety 0) (debug 0)))
+(declaim (optimize (speed 0) (safety 3) (debug 3)))
 
 ; this file contains
 ;  some lexing routines to read the PEG grammar
@@ -11,8 +12,7 @@
 ; functions to turn a string into lexed structures
 
 (defun str2list (str) 
-  (loop for i across str collect i)
-  )
+  (loop for i across str collect i))
 
 ; loops across the input looking for the specified quote char
 ; (this function is called for each of [, " and ')
@@ -21,7 +21,7 @@
 
 ; I would love to find a more elegant way of doing this 
 
-(defun prelex (charList quoteCharStart quoteCharEnd lexSymbol) 
+(defun OLDprelex (charList quoteCharStart quoteCharEnd lexSymbol) 
   (let ((result ())
 	(quotedChars ())
 	(inString nil))
@@ -33,17 +33,39 @@
 						(if (not inString) 
 						    (progn 
 						      (push (list lexSymbol (makeStringToken quotedChars)) result) 
-						      (setq quotedChars nil)
-						      )
-						    )
-						)))
+						      (setq quotedChars nil))))))
 				 (if (not (or (equal c quoteCharStart)
 					      (equal c quoteCharEnd)))
 				     (if inString 
 					 (push c quotedChars) 
-					 (push c result)))
-				 )
-	  ) 
+					 (push c result)))))
+    (nreverse result)))
+
+(defun prelex (charList quoteCharStart quoteCharEnd lexSymbol) 
+  (let ((result ())
+	(quotedChars ())
+	(inString nil))
+    (loop for c in charList
+	  and prev-char = nil then c
+	  do (progn 
+	       (if (and (not (equal prev-char #\\)) 
+			(or (equal c quoteCharStart) 
+			    (equal c quoteCharEnd))) 
+		   (progn (setq inString (not inString)) ;toggle whether we are inside the quote or not
+			  (when (and quotedChars
+				     (not inString))
+			    (push (list lexSymbol (makeStringToken quotedChars)) result) 
+			    (setq quotedChars nil)))
+		   (if inString 
+		       (if (equal prev-char #\\)
+			   (progn
+			     (pop quotedChars)
+			     (push (case c
+				     (#\t #\Tab)
+				     (#\n #\Newline)
+				     (otherwise c)) quotedChars))
+			   (push c quotedChars))
+		       (push c result)))))
     (nreverse result)))
 
 ; turn a list of chars into a string
@@ -57,17 +79,17 @@
 ; these characters are turned into lexical tokens
 
 (defparameter operatorSubstitutions '((#\+ PLUS +) 
-				     (#\* STAR *) 
-				     (#\? QUESTION-MARK ?) 
-				     (#\! EXCLAMATION-MARK !) 
-				     (#\& AMPERSAND) 
-				     (#\  SPACE) 
-				     (#\( LEFT-BRACKET #\() 
-				     (#\) RIGHT-BRACKET #\)) 
-				     (#\/ SLASH /) 
-				     (#\Newline NEWLINE NL)
-				     (#\. MAGIC-DOT #\.))
-  )
+				      (#\* STAR *) 
+				      (#\? QUESTION-MARK ?) 
+				      (#\! EXCLAMATION-MARK !) 
+				      (#\& AMPERSAND) 
+				      (#\  SPACE) 
+				      (#\( LEFT-BRACKET #\() 
+				      (#\) RIGHT-BRACKET #\)) 
+				      (#\/ SLASH /) 
+				      (#\Newline NEWLINE NL)
+				      (#\# HASH #\#)
+				      (#\. MAGIC-DOT #\.)))
  
 ; strips out lines beginning with a semi-colon (;)
 ; perhaps we should also strip whitespace before the colon?
@@ -88,15 +110,12 @@
 (defun lex (str) 
   (let* ((preprocessed (strip-comments str))
 	 (l (str2list preprocessed)))
-	 
-  (makeIds (nsublis operatorSubstitutions 
-		     (prelex 
+    (makeIds (nsublis operatorSubstitutions 
 		      (prelex 
-		       (prelex l #\[ #\] 'CHARACTER-CLASS)
-		       #\" #\" 'QUOTED-STRING)
-		      #\' #\' 'QUOTED-CHAR))
-	     ))
-)
+		       (prelex 
+			(prelex l #\[ #\] 'CHARACTER-CLASS)
+			#\" #\" 'QUOTED-STRING)
+		       #\' #\' 'QUOTED-CHAR)))))
 
 ; find the names left in the input and turn them into (ID-STRING ...) lists
 ; also process "<-" as (ASSIGN-TO)
@@ -161,42 +180,39 @@
 ; see pegobjects for definitions of the classes instantiated here
 
 (eval-when (:execute :compile-toplevel :load-toplevel)
-  (defun didRuleSet (rs nl rss) (declare (ignore nl))
-    (cons rs rss)
-    )
-
   (defun grammar (rss)
-    (memoize (make-instance 'grammar :expr (memoize rss) :pe-map *pe-map*))
-    )
+    (memoize (make-instance 'grammar :expr (memoize rss) :pe-map *pe-map*)))
   (defun ruleset (lhs assign-to ordered-expr-list) (declare (ignore assign-to))
-	 (memoize (make-instance 'named-non-terminal :name (intern (strip-quotes (first lhs))) :expr ordered-expr-list))
-    )
-  (defun expression-list (l)
-    (if (typep l 'parse-element)
-	l
-	(memoize (make-instance 'expression-list :expr (memoize l) :debugtag "ex1"))))
-  
+	 (memoize (make-instance 'named-non-terminal :name (intern (strip-quotes (first lhs))) :expr ordered-expr-list)))
+  (defun expression-list-with-hook (l hook)
+    (if hook
+	(if (typep l 'parse-element)
+	    (memoize (list l (first hook)))
+	    (memoize (append l hook)))
+	(memoize l)))
+    
   (defun expression-list2 (a b)
     (cond ((and (not (listp a))
-	       (not (listp b)))
-	    (list a b))
+		(not (listp b)))
+	   (memoize (list a b)))
+	  ((and (listp a)
+		(listp b))
+	   (memoize (append a b)))
 	  ((listp a)
-	    (append a (list b)))
+	   (memoize (append a (list b))))
 	  ((listp b)
-	   (append (list a) b))
-	  (t (append a b))
-	  )
-)
-
+	   (memoize (append (list a) b)))
+	  (t (error "bad expr case"))))
+  (defun simple-ordered-expression-list (el)
+    (memoize el))
+  
   (defun ordered-expr-list (el oelt)
     (if (typep oelt 'ordered-expr-list)
         (memoize (make-instance 'ordered-expr-list :expr (memoize (append (list el) (slot-value oelt 'expr)))))
-	(memoize (make-instance 'ordered-expr-list :expr (memoize (list el oelt))))
-))
-
+	(memoize (make-instance 'ordered-expr-list :expr (memoize (list el oelt))))))
+  
   (defun tail-expression-list (slash el) (declare (ignore slash))
 	 (memoize el))
-
   (defun character-class (cl)
     (memoize (make-instance 'character-class :feature (first cl) )))
   (defun quoted-char (qc)
@@ -210,7 +226,7 @@
 	(break "empty quoted string")
 	)))
   (defun zero-or-more (e star) (declare (ignore star))
-    (memoize (make-instance 'zero-or-more :expr (memoize e))))
+	 (memoize (make-instance 'zero-or-more :expr (memoize e))))
   (defun negated (neg e) (declare (ignore neg))
 	 (memoize (make-instance 'negated :expr (memoize e))))
   (defun followed-by (amp e) (declare (ignore amp))
@@ -218,19 +234,18 @@
   (defun magic-dot (md) (declare (ignore md))
 	 (memoize (make-instance 'magic-dot :feature #\.)))
   (defun eof (ex dot) (declare (ignore ex) (ignore dot))
-	 (memoize (make-instance 'eof :feature 'EOF))
-	 )
-  (defun at-least-one (e plus) (declare (ignore plus))
+	 (memoize (make-instance 'eof :feature 'EOF)))
+    (defun at-least-one (e plus) (declare (ignore plus))
 	 (memoize (make-instance 'at-least-one :expr (memoize e))))
   (defun optional (e qm) (declare (ignore qm))
 	 (memoize (make-instance 'optional :expr (memoize e))))
   (defun bracketed-rule (a e b) (declare (ignore a b))
 	 (cond ((and (listp e) 
 		     (equal (list-length e) 1))
-		 (first e))
-	       (t e)))
+		(memoize (first e)))
+	       (t (memoize e ))))
   (defun call-rule (i)
-    (memoize (make-instance 'call-rule :feature (intern  (first i)))))
+    (memoize (make-instance 'call-rule :feature (intern (first i)))))
   (defun nt1 (&rest words)
     (loop for w in words do 
 	  (if t ; we can insert a user-supplied function here to remove extraneous words or characters in the LHS rules
@@ -241,27 +256,32 @@
 	 (cond ((and (null ruleset) (null rulesets)) nil)
 	       ((null ruleset) rulesets)
 	       ((null rulesets) ruleset)
-	       (t (cond ((listp rulesets) (cons ruleset rulesets))
-			(t (list ruleset rulesets))))))
+	       (t (cond ((listp rulesets) (memoize (cons ruleset rulesets)))
+			(t (memoize (list ruleset rulesets)))))))
   (defun trivial-match (left-bracket right-bracket) (declare (ignore left-bracket right-bracket))
-    (memoize (make-instance 'trivial-match :feature nil))
-))
+    (memoize (make-instance 'trivial-match :feature nil)))
+  (defun lambda-ref (hash fun-name)
+    (memoize (make-instance 'lambda-ref :feature (first fun-name))))
+  )
 
 ; ** definition of PEG grammar
 
-(yacc:define-parser *peg-grammar-parser* (:muffle-conflicts t)
+(yacc:define-parser *peg-grammar-parser* (:muffle-conflicts nil)
     (:start-symbol grammar)
-  (:terminals (id-string ASSIGN-TO transient newline space norats slash ampersand question-mark exclamation-mark left-bracket right-bracket plus star character-class quoted-string quoted-char magic-dot))
+  (:terminals (id-string ASSIGN-TO transient newline space norats slash ampersand question-mark exclamation-mark left-bracket right-bracket plus star character-class quoted-string quoted-char magic-dot hash))
   (:precedence ((:left star plus question-mark slash) (:right ampersand exclamation-mark)))
   
   (grammar (rulesets #'grammar))
   (rulesets (ruleset newline rulesets #'rulesets) ())
   (ruleset (LHS assign-to ordered-expr-list #'ruleset) ())
   (LHS (id-string id-string id-string #'nt1) (id-string id-string #'nt1) (transient id-string #'nt1) (norats id-string #'nt1) (id-string #'nt1))
-  (ordered-expr-list (expression-list #'expression-list) (expression-list ordered-expr-list-tail #'ordered-expr-list))
+  (ordered-expr-list (expression-list #'simple-ordered-expression-list) (expression-list ordered-expr-list-tail #'ordered-expr-list))
   (ordered-expr-list-tail (slash ordered-expr-list #'tail-expression-list))
-  (expression-list (expr #'expression-list) (expr expression-list #'expression-list2))
-  (expr (bracketed-rule) (exclamation-mark magic-dot #'eof) (expr star #'zero-or-more) (expr plus #'at-least-one) (expr question-mark #'optional) (ampersand expr #'followed-by) (exclamation-mark expr #'negated) (character-class #'character-class) (quoted-string #'quoted-string) (quoted-char #'quoted-char) (id-string #'call-rule) (magic-dot #'magic-dot))
+  (expression-list (expr action-hook #'expression-list-with-hook) (expr expression-list #'expression-list2))
+  (action-hook (lambda-ref) ()) ;lambda-block
+  (lambda-ref (hash id-string #'lambda-ref))
+  (expr (bracketed-rule #'(lambda (pe) (memoize pe)))
+	(exclamation-mark magic-dot #'eof) (expr star #'zero-or-more) (expr plus #'at-least-one) (expr question-mark #'optional) (ampersand expr #'followed-by) (exclamation-mark expr #'negated) (character-class #'character-class) (quoted-string #'quoted-string) (quoted-char #'quoted-char) (id-string #'call-rule) (magic-dot #'magic-dot))
   (bracketed-rule (left-bracket ordered-expr-list right-bracket #'bracketed-rule) (left-bracket right-bracket #'trivial-match))
 )
 

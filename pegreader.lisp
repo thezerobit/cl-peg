@@ -89,6 +89,7 @@
 				      (#\/ SLASH /) 
 				      (#\Newline NEWLINE NL)
 				      (#\# HASH #\#)
+				      (#\@ AT #\@)
 				      (#\. MAGIC-DOT #\.)))
  
 ; strips out lines beginning with a semi-colon (;)
@@ -262,13 +263,15 @@
     (memoize (make-instance 'trivial-match :feature nil)))
   (defun lambda-ref (hash fun-name)
     (memoize (make-instance 'lambda-ref :feature (first fun-name))))
+  (defun match(at fun-name)
+    (memoize (make-instance 'match :feature (first fun-name))))
   )
 
 ; ** definition of PEG grammar
 
 (yacc:define-parser *peg-grammar-parser* (:muffle-conflicts nil)
     (:start-symbol grammar)
-  (:terminals (id-string ASSIGN-TO transient newline space norats slash ampersand question-mark exclamation-mark left-bracket right-bracket plus star character-class quoted-string quoted-char magic-dot hash))
+  (:terminals (id-string ASSIGN-TO transient newline space norats slash ampersand question-mark exclamation-mark left-bracket right-bracket plus star character-class quoted-string quoted-char magic-dot at hash))
   (:precedence ((:left star plus question-mark slash) (:right ampersand exclamation-mark)))
   
   (grammar (rulesets #'grammar))
@@ -281,7 +284,7 @@
   (action-hook (lambda-ref) ()) ;lambda-block
   (lambda-ref (hash id-string #'lambda-ref))
   (expr (bracketed-rule #'(lambda (pe) (memoize pe)))
-	(exclamation-mark magic-dot #'eof) (expr star #'zero-or-more) (expr plus #'at-least-one) (expr question-mark #'optional) (ampersand expr #'followed-by) (exclamation-mark expr #'negated) (character-class #'character-class) (quoted-string #'quoted-string) (quoted-char #'quoted-char) (id-string #'call-rule) (magic-dot #'magic-dot))
+	(exclamation-mark magic-dot #'eof) (expr star #'zero-or-more) (expr plus #'at-least-one) (expr question-mark #'optional) (ampersand expr #'followed-by) (exclamation-mark expr #'negated) (character-class #'character-class) (quoted-string #'quoted-string) (quoted-char #'quoted-char) (id-string #'call-rule) (at id-string #'match) (magic-dot #'magic-dot))
   (bracketed-rule (left-bracket ordered-expr-list right-bracket #'bracketed-rule) (left-bracket right-bracket #'trivial-match))
 )
 

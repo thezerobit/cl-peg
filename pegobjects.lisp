@@ -22,6 +22,7 @@
 (defclass quoted-string (parse-element-with-slot) ()) 
 
 (defclass lambda-ref (parse-element-with-slot) ())
+(defclass match (parse-element-with-slot) ())
 
 ; this is the only grouping-element with an extra slot
 
@@ -129,6 +130,9 @@
   (equal (slot-value a 'feature) (slot-value b 'feature)))
 (defmethod compare ((a quoted-string) (b quoted-string))
   (equal (slot-value a 'feature) (slot-value b 'feature)))
+(defmethod compare ((a match) (b match))
+  (equal (slot-value a 'feature) (slot-value b 'feature)))
+
 
 (defmethod hash ((pe parse-element-with-slot))
   (logxor (sxhash (class-of pe)) 

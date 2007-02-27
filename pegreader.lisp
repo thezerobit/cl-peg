@@ -190,7 +190,9 @@
 	(if (typep l 'parse-element)
 	    (memoize (list l (first hook)))
 	    (memoize (append l hook)))
-	(memoize l)))
+	(if (listp l)
+        (memoize l)
+        (memoize (list l)))))
     
   (defun expression-list2 (a b)
     (cond ((and (not (listp a))

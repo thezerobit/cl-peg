@@ -1,7 +1,7 @@
-sentence <-  article? subject verb ( preposition? article? (object / object preposition object ))
+sentence <-  article? subject verb ( preposition? article? (object preposition object / object ))
 spaces <- [ ]*
-article <- spaces ("the" / "the two" / "a")
+article <- spaces ("the two" / "the" / "a")
 preposition <- spaces ("on" / "at" / "to" / "with")
-subject <- spaces ("man" / "men" / "dog" / "dogs" / "cat")
+subject <- spaces ("man" / "men" / "dogs" / "dog" / "cat")
 verb <- spaces ("sat" / "saw" / "shot" / "gave")
 object <- spaces ("cannon" / "hat" / "mat")

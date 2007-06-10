@@ -18,7 +18,7 @@
 ; OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 ; THE SOFTWARE.
 
-(defpackage #:yacc
+(defpackage #:cl-peg-yacc
   (:use #:common-lisp)
   (:export #:make-production #:make-grammar #:make-parser #:parse-with-lexer
            #:define-grammar #:define-parser
@@ -28,7 +28,7 @@
   (:import-from #:extensions #:required-argument #:memq)
   )
 
-(in-package #:yacc)
+(in-package #:cl-peg-yacc)
 
 #-CMU
 (defun required-argument () (error "A required argument was not supplied"))

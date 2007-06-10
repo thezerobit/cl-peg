@@ -91,11 +91,7 @@ jewel at subvert-the-dominant-paradigm.net
 
 Implementation notes:
 
-This is my first Lisp program, I'm sure there are many ugly hacks and inefficiencies. The code in pegreader.lisp only executes once when parsing the PEG definition and doesn't have to be very fast.
-
 pegobjects.lisp implements the classes that make up the peg grammar tree. Most of this file is hashing and comparison routines for the genhash library.
-
-Profiling this code suggests that the genhash library could be replaced with something faster.
 
 matcher.lisp contains the methods that match in the input against the peg grammar. Some over-optimisation here.
 

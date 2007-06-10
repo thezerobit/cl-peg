@@ -21,26 +21,6 @@
 
 ; I would love to find a more elegant way of doing this 
 
-(defun OLDprelex (charList quoteCharStart quoteCharEnd lexSymbol) 
-  (let ((result ())
-	(quotedChars ())
-	(inString nil))
-    (loop for c in charList do (progn 
-				 (if (or (equal c quoteCharStart) 
-					 (equal c quoteCharEnd))
-				     (progn (setq inString (not inString))
-					    (if (not (null (first quotedChars))) 
-						(if (not inString) 
-						    (progn 
-						      (push (list lexSymbol (makeStringToken quotedChars)) result) 
-						      (setq quotedChars nil))))))
-				 (if (not (or (equal c quoteCharStart)
-					      (equal c quoteCharEnd)))
-				     (if inString 
-					 (push c quotedChars) 
-					 (push c result)))))
-    (nreverse result)))
-
 (defun prelex (charList quoteCharStart quoteCharEnd lexSymbol) 
   (let ((result ())
 	(quotedChars ())
@@ -271,7 +251,7 @@
 
 ; ** definition of PEG grammar
 
-(yacc:define-parser *peg-grammar-parser* (:muffle-conflicts nil)
+(cl-peg-yacc:define-parser *peg-grammar-parser* (:muffle-conflicts nil)
     (:start-symbol grammar)
   (:terminals (id-string ASSIGN-TO transient newline space norats slash ampersand question-mark exclamation-mark left-bracket right-bracket plus star character-class quoted-string quoted-char magic-dot at hash))
   (:precedence ((:left star plus question-mark slash) (:right ampersand exclamation-mark)))
@@ -299,7 +279,7 @@
 	     (read-sequence s file) s))
 	  )) 
     (NET.HEXAPODIA.HASHTABLES:hashclr *pe-map*)
-    (yacc:parse-with-lexer (peg-lexer morph_string) *peg-grammar-parser*)))
+    (cl-peg-yacc:parse-with-lexer (peg-lexer morph_string) *peg-grammar-parser*)))
 
 
 

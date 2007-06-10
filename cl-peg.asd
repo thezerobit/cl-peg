@@ -1,6 +1,6 @@
 (defsystem cl-peg
   :description "PEG parser"
-  :version "0.03"
+  :version "0.05"
   :author "John Leuner"
   :licence "MIT License"
   :components (	(:file "package")

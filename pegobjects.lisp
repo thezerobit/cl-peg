@@ -92,8 +92,8 @@
 
 
 ; this is the only way I could find to reset this hash-function
-
-(remhash 'cl-peg::pehash1 NET.HEXAPODIA.HASHTABLES::*HASH-NICKNAME-MAP*)
+;(remhash 'cl-peg::pehash1 NET.HEXAPODIA.HASHTABLES::*HASH-NICKNAME-MAP*)
+;FIXME
 (NET.HEXAPODIA.HASHTABLES::register-hash-function 'pehash1 #'pe-hash #'pe-compare)
 
 (defvar *pe-map*)

@@ -169,14 +169,14 @@
 ; FIXME this is duplicated for parse-element and for list
 ; we check whether we have cached this lookup before doing the match itself
 
-(defmethod parse-and-match :around ((pe parse-element) input-char-list (input-offset fixnum))
+(defmethod parse-and-match :around ((pe parse-element) input-char-list input-offset)
   (let ((pr (lookup-parse-result pe input-offset)))
     (if (null pr)
 	(set-parse-result pe input-offset (call-next-method))
 	pr))
 )
 
-(defmethod parse-and-match :around ((l list) input-char-list (input-offset fixnum))
+(defmethod parse-and-match :around ((l list) input-char-list input-offset)
   (let ((pr (lookup-parse-result l input-offset)))
     (if (null pr)
 	(set-parse-result l input-offset (call-next-method))
@@ -245,20 +245,20 @@
 
 ; not sure how to help the compiler make this efficient
 
-(defmethod parse-and-match ((md magic-dot) input-char-list (input-offset fixnum))
+(defmethod parse-and-match ((md magic-dot) input-char-list input-offset)
   (let ((in-char (get-input-el input-char-list input-offset)))
     (if (eq (class-of in-char) (class-of #\b))
 	(save-pr t md nil input-offset (+ (the (and fixnum (integer 0 1000000)) input-offset) 1))
 	(parse-fail)
     )))
 
-(defmethod parse-and-match ((eof eof) (input-char-list sequence) (input-offset fixnum))
+(defmethod parse-and-match ((eof eof) (input-char-list sequence) input-offset)
   (if (>= input-offset (length input-char-list))
       (save-pr t eof nil input-offset input-offset)
       (parse-fail)
 ))
 
-(defmethod parse-and-match ((q quoted-char) input-char-list (input-offset fixnum))
+(defmethod parse-and-match ((q quoted-char) input-char-list input-offset)
   (let ((in-char (get-input-el input-char-list input-offset))
 	(feature-string (slot-value q 'feature)))
     (declare (simple-string feature-string))
@@ -269,7 +269,7 @@
 	)))
 
 ; this is speed 1 because SBCL produces so many notes at speed 3
-(defmethod parse-and-match ((q quoted-string) input-char-list (input-offset fixnum))
+(defmethod parse-and-match ((q quoted-string) input-char-list input-offset)
   (declare (optimize (speed 1)))
   (let* ((match-string (slot-value q 'feature))
 	 (match-string-length (length match-string))
@@ -282,7 +282,7 @@
     )
   )
 
-(defmethod parse-and-match ((cc character-class) input-char-list (input-offset fixnum))
+(defmethod parse-and-match ((cc character-class) input-char-list input-offset)
   (let ((cin (get-input-el input-char-list input-offset)))
     (if (null cin)
 	(parse-fail)
@@ -301,7 +301,7 @@
 (defmethod parse-and-match ((el expression-list) input-char-list input-offset)
   (parse-and-match (slot-value el 'expr) input-char-list input-offset))
 
-(defmethod parse-and-match ((l list) input-char-list (input-offset fixnum))
+(defmethod parse-and-match ((l list) input-char-list input-offset)
   (if (null l)
       (break)
       (let ((pr (parse-and-match (first l) input-char-list input-offset)))

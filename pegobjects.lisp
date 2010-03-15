@@ -4,7 +4,7 @@
 
 ; ** classes modelling PEG expressions
 
-(defclass parse-element () ((hash-val :type fixnum
+(defclass parse-element () ((hash-val :type (or fixnum nil)
 				      :initform nil)))
 
 

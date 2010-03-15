@@ -13,6 +13,29 @@
 (defvar *keep-parse-result* nil)
 (defvar *clean-parse-tree* nil)
 
+; each parsing element has a parse-and-match function
+; the parse table stores a parse-node for each parse-element at each attempted input-offset
+
+
+(defstruct (parse-node (:constructor make-parse-value (parse-element children start-offset end-offset))
+	       )
+  (parse-element nil :type (or parse-element list null))
+  (children nil )
+  (start-offset 0 :type fixnum)
+  (end-offset 0 :type fixnum))
+
+(defmethod print-object ((pv parse-node) stream)
+  (format stream "#S(PV :PE ~A :CHILDREN ~A)" (parse-node-parse-element pv) (parse-node-children pv))
+)
+
+(defstruct (parse-result (:constructor make-pr (matched root-parse-node))
+	       )
+  (matched nil :type (or null t))
+  (matched-whole-input nil :type (or null t))
+  (root-parse-node nil :type (or null parse-node))
+  (original-input nil)
+  (original-input-offset 0 :type fixnum))
+
 (defun parse (grammar input-text &key (input-offset 0) save-parse-tree uncleaned-parse-tree) (declare (type grammar grammar) (sequence input-text) (fixnum input-offset))
        ; use the first rule from the grammar as the target
        (parse-rule
@@ -56,29 +79,6 @@
 	  pr
       )))
 
-
-; each parsing element has a parse-and-match function
-; the parse table stores a parse-node for each parse-element at each attempted input-offset
-
-
-(defstruct (parse-node (:constructor make-parse-value (parse-element children start-offset end-offset))
-	       )
-  (parse-element nil :type (or parse-element list null))
-  (children nil )
-  (start-offset 0 :type fixnum)
-  (end-offset 0 :type fixnum))
-
-(defmethod print-object ((pv parse-node) stream)
-  (format stream "#S(PV :PE ~A :CHILDREN ~A)" (parse-node-parse-element pv) (parse-node-children pv))
-)
-
-(defstruct (parse-result (:constructor make-pr (matched root-parse-node))
-	       )
-  (matched nil :type (or null t))
-  (matched-whole-input nil :type (or null t))
-  (root-parse-node nil :type (or null parse-node))
-  (original-input nil)
-  (original-input-offset 0 :type fixnum))
 
 (defun pr-matched (pr) (parse-result-matched pr))
 (defun pr-end-offset (pr) (parse-result-end-offset pr))
